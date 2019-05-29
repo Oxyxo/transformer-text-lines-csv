@@ -1,49 +1,102 @@
 <!DOCTYPE html>
-<!-- Author: Oxana Bulanova, 2019 time 70 min 19.5.19 -->
 <html>
-  <head>
+<head>
   <meta charset="UTF-8">
-    <title>CAT price transformer</title>
-  </head>
-  <body>
-  <!-- Submit your file and click Run -->
-    <input type="file" id="fileinput" />
+  <title>CAT file reader</title>
+</head>
+<body>
+  <div>
+    <p>Select a CAT file to process</p>
 
-    <button type="button" id="run">Run</button>
-   
-    <script type="text/javascript">
-      document.getElementById('fileinput').addEventListener('change', readfile, false);
-      document.getElementById('run').addEventListener('click', run, false);
-      
-      var content = ""
-      // Readfile reads the input file from the fileinput element and stores its content inside the content variable
-      function readfile(event) {
-        var file = event.target.files[0];
-        if (!file){
-            alert("Failed to load file");
-            return
-        }
+    <input type="file" id="file" />
+    <input type="button" value="submit" id="submit" />
+  </div>
 
-        var reader = new FileReader();
-        reader.onload = function(event) {
-          alert("I managed to read your file");
-          content = event.target.result;
+  <script type="application/javascript">
+    var file = document.getElementById("file");
+    var submit = document.getElementById("submit");
+    
+    submit.addEventListener("click", handle);
+
+    // handle is the controller responsible for the
+    // reading and processing of the given file and settings
+    function handle() {
+      var document = file.files[0];
+      var line = "";
       
-          //console.log(content.length);
+      loader(document, function (data) {
+        for (var i = 0; i < data.byteLength; i++) {
+          console.log(String.fromCharCode(new Uint8Array(data.slice(i, i+1))[0]))
         }
-        // Building up a reader line by line from a file
-        reader.readAsText(file);
+      }, function() {
+        console.log("done!!")
+      })
+    }
+
+    // Hashing big files with JavaScript
+    // https://medium.com/@0xVaccaro/hashing-big-file-with-filereader-js-e0a5c898fc98
+
+    // loader set's up a new FileReader that reads the given file in chunks
+    function loader(file, callbackProgress, callbackFinal) {
+      var chunkSize = 1024 * 1024 // Bytes - ~1.04MB
+      var offset = 0;
+      var size = chunkSize;
+      var partial;
+      var index = 0;
+
+      if (file.size === 0) {
+        callbackFinal();
       }
-      function run() {
-        var lines = content.split('\n');
-        for(var index = 0; index < lines.length; index++) {
-          var line = lines[index];
-          console.log(line);
-          console.log(line.length);
-          // Here i see for group 1 is 72 characters, group 2 has 80 characters length
+      while (offset < file.size) {
+        partial = file.slice(offset, offset + size);
+        var reader = new FileReader;
+        reader.size = chunkSize;
+        reader.offset = offset;
+        reader.index = index;
+        reader.onload = function (evt) {
+          callbackRead(this, file, evt, callbackProgress, callbackFinal);
+        };
+        reader.readAsArrayBuffer(partial);
+        offset += chunkSize;
+        index += 1;
+      }
+    }
+
+    var previous = [];
+    var lastOffset = 0;
+
+    // callbackRead checks the given result and returns it to the callbackProgress
+    function callbackRead(reader, file, evt, callbackProgress, callbackFinal) {
+      if (lastOffset !== reader.offset) {
+        // not of order chunk: put into buffer
+        previous.push({ offset: reader.offset, size: reader.size, result: reader.result });
+        return;
+      }
+
+      function parseResult(offset, size, result) {
+        lastOffset = offset + size;
+        callbackProgress(result);
+        if (offset + size >= file.size) {
+          lastOffset = 0;
+          callbackFinal();
         }
       }
-      // Validate no single/ zero items in $ fields/prices
-    </script>
-  </body>
+
+      // in order chunk
+      parseResult(reader.offset, reader.size, reader.result);
+
+      // check previous buffered chunks
+      var buffered = [{}]
+      while (buffered.length > 0) {
+        buffered = previous.filter(function (item) {
+          return item.offset === lastOffset;
+        });
+        buffered.forEach(function (item) {
+          parseResult(item.offset, item.size, item.result);
+          previous.remove(item);
+        })
+      }
+    }
+  </script>
+</body>
 </html>
