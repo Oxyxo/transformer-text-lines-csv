@@ -17,7 +17,10 @@
             <form onsubmit="handle(); return false;">
               <input type="text" id="file-name" value="price-list" style="width: 90%; max-width: 525px; display: block;">
               <input type="file" id="file" />
-              <input type="submit" value="transform" id="submit" class="button button-outline" /> <a id="result" class="button button-outline" disabled>download</a>
+              <input type="submit" value="transform" id="submit" class="button button-outline" />
+
+              <ul id="download">
+              </ul>
             </form>
 
             <div class="lds-grid hidden" id="loader">
@@ -42,6 +45,8 @@
 
       var encoder = new TextEncoder();
       var cr = "\n";
+      var partType = "1";
+      var depositType = "2";
       
       // all offsets are relative to the file offset (string starts at 1)
       var partOffsets = [
@@ -138,6 +143,7 @@
       // handle is the controller responsible for the
       // reading and processing of the given file and settings
       function handle() {
+        document.getElementById("download").innerHTML = "";
         var loader = document.getElementById("loader");
         var file = files.files[0];
 
@@ -160,10 +166,6 @@
           content: reader.result,
           handle(line) {
             var type = line[0];
-            
-            var partType = "1";
-            var depositType = "2";
-
             var row = "";
 
             switch (type) {
@@ -184,22 +186,43 @@
             results.push(row);
           },
           eof() {
-            debugger;
-            var blob = new Blob(results, {
+            var full = new Blob(results, {
+              type: "data:text/csv;charset=utf-8;",
+            });
+
+            var parts = new Blob(results.filter(function (row) {
+              return row[0] == partType;
+            }), {
+              type: "data:text/csv;charset=utf-8;",
+            });
+
+            var deposit = new Blob(results.filter(function (row) {
+              return row[0] == depositType;
+            }), {
               type: "data:text/csv;charset=utf-8;",
             });
 
             var input = document.getElementById("file-name");
             var fileName = input ? input.value : "price-list";
 
-            var el = document.getElementById("result")
-            el.href = URL.createObjectURL(blob);
-            el.download = fileName + ".csv";
-            el.removeAttribute("disabled");
-
-            console.log("end of file...");
+            createTypeElement(URL.createObjectURL(full), "full", fileName)
+            createTypeElement(URL.createObjectURL(parts), "parts", fileName + "-parts")
+            createTypeElement(URL.createObjectURL(deposit), "deposit", fileName + "-deposit")
           }
         });
+      }
+
+      function createTypeElement(href, value, fileName) {
+        var parent = document.createElement("li");
+        var button = document.createElement("a");
+
+        parent.appendChild(button);
+        button.className = "button button-outline";
+        button.href = href;
+        button.innerHTML = "Download " + value;
+        button.download = fileName + ".csv";
+
+        document.getElementById("download").appendChild(parent);
       }
 
       // parseLineToCsv parses the given line with the given offset set
