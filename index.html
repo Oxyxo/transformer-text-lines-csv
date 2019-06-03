@@ -1,102 +1,320 @@
 <!DOCTYPE html>
 <html>
-<head>
-  <meta charset="UTF-8">
-  <title>CAT file reader</title>
-</head>
-<body>
-  <div>
-    <p>Select a CAT file to process</p>
-
-    <input type="file" id="file" />
-    <input type="button" value="submit" id="submit" />
-  </div>
-
-  <script type="application/javascript">
-    var file = document.getElementById("file");
-    var submit = document.getElementById("submit");
+  <head>
+    <meta charset="UTF-8" />
+    <title>CAT file reader</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/milligram/1.3.0/milligram.min.css">
+  </head>
+  <body>
+    <div class="container">
     
-    submit.addEventListener("click", handle);
+      <div class="row" style="margin-top: 150px;">
+        <div class="column">
+          <div>
+            <h3>Select a CAT (txt) file to transform</h3>
+            <p>Please make sure that popups are allowed on this website to allow file streaming.<br>The download button will become active once the file is available for download.</p>
+          
+            <form onsubmit="handle(); return false;">
+              <input type="text" id="file-name" value="price-list" style="width: 90%; max-width: 525px; display: block;">
+              <input type="file" id="file" />
+              <input type="submit" value="transform" id="submit" class="button button-outline" /> <a id="result" class="button button-outline" disabled>download</a>
+            </form>
 
-    // handle is the controller responsible for the
-    // reading and processing of the given file and settings
-    function handle() {
-      var document = file.files[0];
-      var line = "";
+            <div class="lds-grid hidden" id="loader">
+              <div></div>
+              <div></div>
+              <div></div>
+              <div></div>
+              <div></div>
+              <div></div>
+              <div></div>
+              <div></div>
+              <div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script type="application/javascript">
+      var files = document.getElementById("file");
+      var submit = document.getElementById("submit");
+
+      var encoder = new TextEncoder();
+      var cr = "\n";
       
-      loader(document, function (data) {
-        for (var i = 0; i < data.byteLength; i++) {
-          console.log(String.fromCharCode(new Uint8Array(data.slice(i, i+1))[0]))
+      // all offsets are relative to the file offset (string starts at 1)
+      var partOffsets = [
+        {
+          name: "type",
+          start: 1,
+          length: 1,
+        },
+        {
+          name: "part number",
+          start: 2,
+          length: 18,
+        },
+        {
+          name: "part type",
+          start: 22,
+          length: 2,
+        },
+        {
+          name: "area dealer net",
+          start: 24,
+          length: 13,
+        },
+        {
+          name: "suggested consumer price",
+          start: 37,
+          length: 13,
+        },
+        {
+          name: "ppc",
+          start: 50,
+          length: 3
+        },
+        {
+          name: "puc",
+          start: 53,
+          length: 1,
+        },
+        {
+          name: "major",
+          start: 56,
+          length: 1,
+        },
+        {
+          name: "minor",
+          start: 57,
+          length: 1,
+        },
+        {
+          name: "suggested consumer price",
+          start: 58,
+          length: 13,
         }
-      }, function() {
-        console.log("done!!")
-      })
-    }
+      ];
 
-    // Hashing big files with JavaScript
-    // https://medium.com/@0xVaccaro/hashing-big-file-with-filereader-js-e0a5c898fc98
+      var depositOffsets = [
+        {
+          name: "type",
+          start: 1,
+          length: 1,
+        },
+        {
+          name: "core deposit",
+          start: 2,
+          length: 12,
+        },
+        {
+          name: "damaged core",
+          start: 15,
+          length: 12,
+        },
+        {
+          name: "total price",
+          start: 28,
+          length: 12,
+        },
+        {
+          name: "scp core deposit",
+          start: 41,
+          length: 12,
+        },
+        {
+          name: "scp damaged",
+          start: 54,
+          length: 12,
+        },
+        {
+          name: "scp total price",
+          start: 67,
+          length: 12,
+        }
+      ];
 
-    // loader set's up a new FileReader that reads the given file in chunks
-    function loader(file, callbackProgress, callbackFinal) {
-      var chunkSize = 1024 * 1024 // Bytes - ~1.04MB
-      var offset = 0;
-      var size = chunkSize;
-      var partial;
-      var index = 0;
+      // handle is the controller responsible for the
+      // reading and processing of the given file and settings
+      function handle() {
+        var loader = document.getElementById("loader");
+        var file = files.files[0];
 
-      if (file.size === 0) {
-        callbackFinal();
-      }
-      while (offset < file.size) {
-        partial = file.slice(offset, offset + size);
-        var reader = new FileReader;
-        reader.size = chunkSize;
-        reader.offset = offset;
-        reader.index = index;
-        reader.onload = function (evt) {
-          callbackRead(this, file, evt, callbackProgress, callbackFinal);
+        loader.classList.remove("hidden");
+
+        var reader = new FileReader();
+        reader.onload = function() {
+          transformFile(reader);
+
+          loader.classList.add("hidden");
         };
-        reader.readAsArrayBuffer(partial);
-        offset += chunkSize;
-        index += 1;
-      }
-    }
 
-    var previous = [];
-    var lastOffset = 0;
-
-    // callbackRead checks the given result and returns it to the callbackProgress
-    function callbackRead(reader, file, evt, callbackProgress, callbackFinal) {
-      if (lastOffset !== reader.offset) {
-        // not of order chunk: put into buffer
-        previous.push({ offset: reader.offset, size: reader.size, result: reader.result });
-        return;
+        reader.readAsText(file);
       }
 
-      function parseResult(offset, size, result) {
-        lastOffset = offset + size;
-        callbackProgress(result);
-        if (offset + size >= file.size) {
-          lastOffset = 0;
-          callbackFinal();
+      function transformFile(reader) {
+        var results = [];
+        
+        lineByLine({
+          content: reader.result,
+          handle(line) {
+            var type = line[0];
+            
+            var partType = "1";
+            var depositType = "2";
+
+            var row = "";
+
+            switch (type) {
+              case partType:
+                row = parseLineToCsv(line, partOffsets);
+                break;
+              case depositType:
+                // append the previous line on order to extract the id
+                var l = line + results[results.length - 2];
+                row = parseLineToCsv(l, depositOffsets);
+                break;
+              default:
+                console.log("unknown part type!:", type);
+                console.log(line);
+                return
+            }
+
+            results.push(row);
+          },
+          eof() {
+            debugger;
+            var blob = new Blob(results, {
+              type: "data:text/csv;charset=utf-8;",
+            });
+
+            var input = document.getElementById("file-name");
+            var fileName = input ? input.value : "price-list";
+
+            var el = document.getElementById("result")
+            el.href = URL.createObjectURL(blob);
+            el.download = fileName + ".csv";
+            el.removeAttribute("disabled");
+
+            console.log("end of file...");
+          }
+        });
+      }
+
+      // parseLineToCsv parses the given line with the given offset set
+      function parseLineToCsv(line, offsets) {
+        var collection = [];
+        var row = "";
+
+        for (var index = 0; index < offsets.length; index++) {
+          var offset = offsets[index];
+          if (row.length > 0) {
+            row += ";"
+          }
+
+          // offsets are given as a relative offset
+          row += line.substr(offset.start - 1, offset.length);
+        }
+
+        return row + cr;
+      }
+
+      function lineByLine(options) {
+        var line = "";
+        var last = "";
+
+        // go over every character and detect line breaks
+        for (var index = 0; index < options.content.length; index++) {
+          var char = options.content[index];
+          // detect a line break: if the current character is a carriage return and the last character is a line feed character
+          if (char == cr) {
+            options.handle(line);
+            line = "";
+            continue;
+          }
+
+          line += char;
+          last = char;
+        }
+
+        options.handle(line);
+        options.eof();
+      }      
+    </script>
+
+    <style>
+      .hidden {
+        display: none !important;
+      }
+
+      .lds-grid {
+        display: inline-block;
+        position: relative;
+        width: 64px;
+        height: 64px;
+      }
+      .lds-grid div {
+        position: absolute;
+        width: 13px;
+        height: 13px;
+        border-radius: 50%;
+        background:#9b4dca;
+        animation: lds-grid 1.2s linear infinite;
+      }
+      .lds-grid div:nth-child(1) {
+        top: 6px;
+        left: 6px;
+        animation-delay: 0s;
+      }
+      .lds-grid div:nth-child(2) {
+        top: 6px;
+        left: 26px;
+        animation-delay: -0.4s;
+      }
+      .lds-grid div:nth-child(3) {
+        top: 6px;
+        left: 45px;
+        animation-delay: -0.8s;
+      }
+      .lds-grid div:nth-child(4) {
+        top: 26px;
+        left: 6px;
+        animation-delay: -0.4s;
+      }
+      .lds-grid div:nth-child(5) {
+        top: 26px;
+        left: 26px;
+        animation-delay: -0.8s;
+      }
+      .lds-grid div:nth-child(6) {
+        top: 26px;
+        left: 45px;
+        animation-delay: -1.2s;
+      }
+      .lds-grid div:nth-child(7) {
+        top: 45px;
+        left: 6px;
+        animation-delay: -0.8s;
+      }
+      .lds-grid div:nth-child(8) {
+        top: 45px;
+        left: 26px;
+        animation-delay: -1.2s;
+      }
+      .lds-grid div:nth-child(9) {
+        top: 45px;
+        left: 45px;
+        animation-delay: -1.6s;
+      }
+      @keyframes lds-grid {
+        0%, 100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.5;
         }
       }
-
-      // in order chunk
-      parseResult(reader.offset, reader.size, reader.result);
-
-      // check previous buffered chunks
-      var buffered = [{}]
-      while (buffered.length > 0) {
-        buffered = previous.filter(function (item) {
-          return item.offset === lastOffset;
-        });
-        buffered.forEach(function (item) {
-          parseResult(item.offset, item.size, item.result);
-          previous.remove(item);
-        })
-      }
-    }
-  </script>
-</body>
+    </style>
+  </body>
 </html>
