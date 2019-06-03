@@ -247,7 +247,7 @@
           var value = line.substr(offset.start - 1, offset.length);
 
           if (offset.devide) {
-            value = String(Number(value) / offset.devide).replace('.', ',');
+            value = Number(value) / offset.devide;
           }
 
           // offsets are given as a relative offset
