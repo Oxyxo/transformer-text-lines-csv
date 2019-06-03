@@ -69,11 +69,13 @@
           name: "area dealer net",
           start: 24,
           length: 13,
+          devide: 100,
         },
         {
           name: "suggested consumer price",
           start: 37,
           length: 13,
+          devide: 100,
         },
         {
           name: "ppc",
@@ -99,6 +101,7 @@
           name: "suggested consumer price",
           start: 58,
           length: 13,
+          devide: 100,
         }
       ];
 
@@ -112,31 +115,37 @@
           name: "core deposit",
           start: 2,
           length: 12,
+          devide: 100,
         },
         {
           name: "damaged core",
           start: 15,
           length: 12,
+          devide: 100,
         },
         {
           name: "total price",
           start: 28,
           length: 12,
+          devide: 100,
         },
         {
           name: "scp core deposit",
           start: 41,
           length: 12,
+          devide: 100,
         },
         {
           name: "scp damaged",
           start: 54,
           length: 12,
+          devide: 100,
         },
         {
           name: "scp total price",
           start: 67,
           length: 12,
+          devide: 100,
         }
       ];
 
@@ -236,8 +245,14 @@
             row += ";"
           }
 
+          var value = line.substr(offset.start - 1, offset.length);
+
+          if (offset.devide) {
+            value = Number(value) / offset.devide
+          }
+
           // offsets are given as a relative offset
-          row += line.substr(offset.start - 1, offset.length);
+          row += value;
         }
 
         return row + cr;
