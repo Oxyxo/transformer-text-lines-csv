@@ -189,7 +189,6 @@
               case depositType:
                 // append the previous line on order to extract the id
                 var l = line + results[results.length - 2];
-                console.log(line.length)
                 row = parseLineToCsv(l, depositOffsets);
                 break;
               default:
