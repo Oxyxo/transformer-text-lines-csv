@@ -189,8 +189,8 @@
               row = parseLineToCsv(line, depositOffsets);
               break;
             default:
-              console.log("unknown part type!:", type);
-              console.log(line);
+              console.warn("unknown part type!:", type);
+              console.warn(line);
               return
           }
 
