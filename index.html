@@ -110,6 +110,13 @@
 
     var depositOffsets = [
       {
+        name: "part number",
+        parent: {
+          start: 2,
+          length: 7
+        }
+      },
+      {
         name: "type",
         start: 1,
         length: 1,
@@ -176,17 +183,17 @@
 
       lineByLine({
         content: reader.result,
-        handle(line) {
+        handle(line, parent) {
           var type = line[0];
           var row = "";
 
           switch (type) {
             case partType:
-              row = parseLineToCsv(line, partOffsets);
+              row = parseLineToCsv(line, parent, partOffsets);
               break;
             case depositType:
               // append the previous line on order to extract the id
-              row = parseLineToCsv(line, depositOffsets);
+              row = parseLineToCsv(line, parent, depositOffsets);
               break;
             default:
               console.warn("unknown part type!:", type);
@@ -237,7 +244,7 @@
     }
 
     // parseLineToCsv parses the given line with the given offset set
-    function parseLineToCsv(line, offsets) {
+    function parseLineToCsv(line, parent, offsets) {
       var collection = [];
       var row = "";
 
@@ -247,20 +254,30 @@
           row += ";"
         }
 
-        var value = line.substr(offset.start - 1, offset.length);
-
-        if (offset.divide) {
-          value = String(Number(value) / offset.divide).replace('.', ',');
+        if (offset.parent) {
+          row += parseLineOffset(parent, offset.parent.start - 1, offset.parent.length, offset.parent.divide)
+          continue
         }
 
         // offsets are given as a relative offset
-        row += value;
+        row += parseLineOffset(line, offset.start - 1, offset.length, offset.divide)
       }
 
       return row + cr;
     }
 
+    function parseLineOffset(line, start, length, divide) {
+      var value = line.substr(start, length);
+
+      if (divide) {
+        value = String(Number(value) / divide).replace('.', ',');
+      }
+
+      return value
+    }
+
     function lineByLine(options) {
+      var parent = "";
       var line = "";
       var last = "";
 
@@ -269,7 +286,8 @@
         var char = options.content[index];
         // detect a line break: if the current character is a carriage return and the last character is a line feed character
         if (char == cr) {
-          options.handle(line);
+          options.handle(line, parent);
+          parent = line;
           line = "";
           continue;
         }
@@ -278,7 +296,7 @@
         last = char;
       }
 
-      options.handle(line);
+      options.handle(line, parent);
       options.eof();
     }      
   </script>
